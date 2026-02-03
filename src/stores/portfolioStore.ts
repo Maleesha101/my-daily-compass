@@ -7,6 +7,7 @@ interface PortfolioState {
   
   loadStocks: () => Promise<void>;
   addStock: (stock: Omit<Stock, 'id' | 'createdAt' | 'lastUpdated'>) => Promise<void>;
+  averageStock: (id: string, quantity: number, buyPrice: number) => Promise<void>;
   updateStock: (id: string, updates: Partial<Stock>) => Promise<void>;
   updateStockPrice: (id: string, currentPrice: number) => Promise<void>;
   deleteStock: (id: string) => Promise<void>;
@@ -42,6 +43,27 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
     
     await db.stocks.add(newStock);
     set({ stocks: [...get().stocks, newStock] });
+  },
+
+  averageStock: async (id, quantity, buyPrice) => {
+    const stock = get().stocks.find(s => s.id === id);
+    if (!stock) return;
+    
+    // Calculate new average: (old_qty * old_avg + new_qty * new_price) / total_qty
+    const totalQty = stock.quantity + quantity;
+    const totalInvested = (stock.quantity * stock.avgBuyPrice) + (quantity * buyPrice);
+    const newAvgPrice = totalInvested / totalQty;
+    
+    const updates = {
+      quantity: totalQty,
+      avgBuyPrice: newAvgPrice,
+      lastUpdated: new Date().toISOString(),
+    };
+    
+    await db.stocks.update(id, updates);
+    set({
+      stocks: get().stocks.map(s => s.id === id ? { ...s, ...updates } : s),
+    });
   },
 
   updateStock: async (id, updates) => {

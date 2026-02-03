@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Plus, Trash2, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, Layers } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { StatCard } from '@/components/shared/StatCard';
 import { formatCurrency, getPLColor } from '@/utils/helpers';
@@ -39,6 +39,7 @@ export default function Portfolio() {
     stocks,
     loadStocks,
     addStock,
+    averageStock,
     updateStockPrice,
     deleteStock,
     getTotalInvested,
@@ -48,12 +49,18 @@ export default function Portfolio() {
   } = usePortfolioStore();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAverageDialogOpen, setIsAverageDialogOpen] = useState(false);
+  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [formData, setFormData] = useState({
     symbol: '',
     name: '',
     quantity: 0,
     avgBuyPrice: 0,
     currentPrice: 0,
+  });
+  const [averageFormData, setAverageFormData] = useState({
+    quantity: 0,
+    buyPrice: 0,
   });
 
   useEffect(() => {
@@ -70,6 +77,22 @@ export default function Portfolio() {
   const handleDelete = async (id: string) => {
     if (confirm('Remove this stock from portfolio?')) {
       await deleteStock(id);
+    }
+  };
+
+  const handleOpenAverage = (stock: Stock) => {
+    setSelectedStock(stock);
+    setAverageFormData({ quantity: 0, buyPrice: stock.currentPrice });
+    setIsAverageDialogOpen(true);
+  };
+
+  const handleAverageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedStock && averageFormData.quantity > 0) {
+      await averageStock(selectedStock.id, averageFormData.quantity, averageFormData.buyPrice);
+      setIsAverageDialogOpen(false);
+      setSelectedStock(null);
+      setAverageFormData({ quantity: 0, buyPrice: 0 });
     }
   };
 
@@ -180,6 +203,59 @@ export default function Portfolio() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Average Stock Dialog */}
+        <Dialog open={isAverageDialogOpen} onOpenChange={setIsAverageDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Shares to {selectedStock?.symbol}</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleAverageSubmit} className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <p>Current: <strong>{selectedStock?.quantity}</strong> shares @ <strong>{formatCurrency(selectedStock?.avgBuyPrice || 0)}</strong> avg</p>
+              </div>
+              <div>
+                <Label htmlFor="avgQuantity">Additional Quantity</Label>
+                <Input
+                  id="avgQuantity"
+                  type="number"
+                  min={1}
+                  value={averageFormData.quantity || ''}
+                  onChange={(e) => setAverageFormData({ ...averageFormData, quantity: Number(e.target.value) })}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="avgBuyPrice">Buy Price (LKR)</Label>
+                <Input
+                  id="avgBuyPrice"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={averageFormData.buyPrice || ''}
+                  onChange={(e) => setAverageFormData({ ...averageFormData, buyPrice: Number(e.target.value) })}
+                  required
+                />
+              </div>
+              {selectedStock && averageFormData.quantity > 0 && averageFormData.buyPrice > 0 && (
+                <div className="p-3 bg-primary/10 rounded-lg text-sm">
+                  <p className="font-medium">New Position Preview:</p>
+                  <p>Total: <strong>{selectedStock.quantity + averageFormData.quantity}</strong> shares</p>
+                  <p>New Avg: <strong>{formatCurrency(
+                    ((selectedStock.quantity * selectedStock.avgBuyPrice) + (averageFormData.quantity * averageFormData.buyPrice)) / 
+                    (selectedStock.quantity + averageFormData.quantity)
+                  )}</strong></p>
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <Button type="button" variant="outline" onClick={() => setIsAverageDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Add Shares</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats */}
@@ -272,14 +348,26 @@ export default function Portfolio() {
                         <span className="text-xs ml-1">({plPercent.toFixed(1)}%)</span>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive"
-                          onClick={() => handleDelete(stock.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleOpenAverage(stock)}
+                            title="Add shares (average)"
+                          >
+                            <Layers className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            onClick={() => handleDelete(stock.id)}
+                            title="Remove stock"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
