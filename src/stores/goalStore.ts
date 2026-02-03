@@ -31,6 +31,7 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       ...goalData,
       id: generateId(),
       current: 0,
+      trackingType: goalData.trackingType || 'cumulative',
       createdAt: new Date().toISOString(),
     };
     
