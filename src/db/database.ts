@@ -28,7 +28,9 @@ export interface Goal {
   referenceId?: string; // Link to habit, category, or portfolio
   target: number;
   current: number;
-  period: 'monthly' | 'yearly';
+  period: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  trackingType: 'per-period' | 'cumulative'; // per-period: target per day/week/month, cumulative: total over period
+  unit?: string; // e.g., "hours", "minutes", "LKR", "days"
   startDate: string;
   endDate?: string;
   status: 'active' | 'completed' | 'failed';

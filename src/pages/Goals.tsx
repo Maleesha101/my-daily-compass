@@ -32,6 +32,8 @@ export default function Goals() {
     type: 'finance' as Goal['type'],
     target: 0,
     period: 'monthly' as Goal['period'],
+    trackingType: 'cumulative' as Goal['trackingType'],
+    unit: '',
   });
 
   useEffect(() => {
@@ -42,10 +44,11 @@ export default function Goals() {
     e.preventDefault();
     await addGoal({
       ...formData,
+      unit: formData.unit || undefined,
       startDate: new Date().toISOString(),
       status: 'active',
     });
-    setFormData({ name: '', type: 'finance', target: 0, period: 'monthly' });
+    setFormData({ name: '', type: 'finance', target: 0, period: 'monthly', trackingType: 'cumulative', unit: '' });
     setIsDialogOpen(false);
   };
 
@@ -119,17 +122,6 @@ export default function Goals() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="target">Target Amount (LKR)</Label>
-                <Input
-                  id="target"
-                  type="number"
-                  min={1}
-                  value={formData.target}
-                  onChange={(e) => setFormData({ ...formData, target: Number(e.target.value) })}
-                  required
-                />
-              </div>
-              <div>
                 <Label htmlFor="period">Period</Label>
                 <Select
                   value={formData.period}
@@ -139,10 +131,49 @@ export default function Goals() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="daily">Daily (e.g., 2 hours every day)</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
                     <SelectItem value="monthly">Monthly</SelectItem>
                     <SelectItem value="yearly">Yearly</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label htmlFor="trackingType">Tracking Type</Label>
+                <Select
+                  value={formData.trackingType}
+                  onValueChange={(v) => setFormData({ ...formData, trackingType: v as Goal['trackingType'] })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="per-period">Per Period (target for each day/week/month)</SelectItem>
+                    <SelectItem value="cumulative">Cumulative (total over period)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="target">Target</Label>
+                  <Input
+                    id="target"
+                    type="number"
+                    min={1}
+                    value={formData.target}
+                    onChange={(e) => setFormData({ ...formData, target: Number(e.target.value) })}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="unit">Unit (optional)</Label>
+                  <Input
+                    id="unit"
+                    value={formData.unit}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                    placeholder="e.g., hours, days, LKR"
+                  />
+                </div>
               </div>
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
@@ -241,7 +272,7 @@ function GoalCard({ goal, icon, onUpdateProgress, onDelete }: GoalCardProps) {
           <div>
             <h3 className="font-medium">{goal.name}</h3>
             <p className="text-xs text-muted-foreground capitalize">
-              {goal.type} • {goal.period}
+              {goal.type} • {goal.period}{goal.trackingType === 'per-period' ? ' (per period)' : ''}
             </p>
           </div>
         </div>
@@ -265,7 +296,7 @@ function GoalCard({ goal, icon, onUpdateProgress, onDelete }: GoalCardProps) {
             />
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            Target: {formatCurrency(goal.target)}
+            Target: {goal.target}{goal.unit ? ` ${goal.unit}` : ''}{goal.trackingType === 'per-period' ? ` / ${goal.period.replace('ly', '')}` : ''}
           </p>
         </div>
       </div>
