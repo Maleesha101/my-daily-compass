@@ -40,6 +40,7 @@ export default function Habits() {
   const [formData, setFormData] = useState({
     name: '',
     category: 'Health' as Habit['category'],
+    period: 'monthly' as Habit['period'],
     goalValue: 20,
     type: 'boolean' as Habit['type'],
     unit: '',
@@ -54,11 +55,43 @@ export default function Habits() {
     setFormData({
       name: '',
       category: 'Health',
+      period: 'monthly',
       goalValue: 20,
       type: 'boolean',
       unit: '',
     });
     setEditingHabit(null);
+  };
+
+  const getDefaultGoalValue = (period: Habit['period']) => {
+    switch (period) {
+      case 'daily': return 1;
+      case 'weekly': return 3;
+      case 'monthly': return 20;
+    }
+  };
+
+  const getGoalLabel = (period: Habit['period']) => {
+    switch (period) {
+      case 'daily': return 'Daily Target';
+      case 'weekly': return 'Times per Week';
+      case 'monthly': return 'Days per Month';
+    }
+  };
+
+  const getGoalDescription = (period: Habit['period'], type: Habit['type']) => {
+    if (type === 'numeric') {
+      switch (period) {
+        case 'daily': return 'Target value to achieve each day';
+        case 'weekly': return 'Target value to achieve each week';
+        case 'monthly': return 'Target value to achieve each month';
+      }
+    }
+    switch (period) {
+      case 'daily': return 'Check off each day you complete it';
+      case 'weekly': return 'How many times per week';
+      case 'monthly': return 'How many days per month';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,6 +112,7 @@ export default function Habits() {
     setFormData({
       name: habit.name,
       category: habit.category,
+      period: habit.period || 'monthly',
       goalValue: habit.goalValue,
       type: habit.type,
       unit: habit.unit || '',
@@ -153,12 +187,35 @@ export default function Habits() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="goalValue">Monthly Goal (days)</Label>
+                  <Label htmlFor="period">Frequency</Label>
+                  <Select
+                    value={formData.period}
+                    onValueChange={(v) => setFormData({ 
+                      ...formData, 
+                      period: v as Habit['period'],
+                      goalValue: getDefaultGoalValue(v as Habit['period'])
+                    })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily (every day)</SelectItem>
+                      <SelectItem value="weekly">Weekly (times per week)</SelectItem>
+                      <SelectItem value="monthly">Monthly (days per month)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {getGoalDescription(formData.period, formData.type)}
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="goalValue">{getGoalLabel(formData.period)}</Label>
                   <Input
                     id="goalValue"
                     type="number"
                     min={1}
-                    max={31}
+                    max={formData.period === 'daily' ? 24 : formData.period === 'weekly' ? 7 : 31}
                     value={formData.goalValue}
                     onChange={(e) => setFormData({ ...formData, goalValue: Number(e.target.value) })}
                   />
@@ -263,6 +320,20 @@ interface HabitCardProps {
 }
 
 function HabitCard({ habit, onEdit, onToggle, onDelete }: HabitCardProps) {
+  const getPeriodLabel = () => {
+    const period = habit.period || 'monthly';
+    switch (period) {
+      case 'daily':
+        return habit.type === 'numeric' 
+          ? `${habit.goalValue} ${habit.unit || 'units'}/day`
+          : 'Daily';
+      case 'weekly':
+        return `${habit.goalValue}x/week`;
+      case 'monthly':
+        return `${habit.goalValue} days/month`;
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -274,7 +345,7 @@ function HabitCard({ habit, onEdit, onToggle, onDelete }: HabitCardProps) {
         <div>
           <h3 className="font-medium">{habit.name}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {habit.category} • {habit.goalValue} days/month
+            {habit.category} • {getPeriodLabel()}
           </p>
           <span className={cn(
             'inline-block mt-2 px-2 py-0.5 text-xs rounded-full',

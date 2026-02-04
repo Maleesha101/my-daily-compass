@@ -5,9 +5,10 @@ export interface Habit {
   id: string;
   name: string;
   category: 'Health' | 'Learning' | 'Finance' | 'Productivity' | 'Personal';
-  goalValue: number; // Target days per month
+  period: 'daily' | 'weekly' | 'monthly'; // How often the habit is tracked
+  goalValue: number; // Target value per period (e.g., 2 hrs/day, 3 times/week, 20 days/month)
   type: 'boolean' | 'numeric';
-  unit?: string; // For numeric habits (e.g., "glasses", "minutes")
+  unit?: string; // For numeric habits (e.g., "glasses", "minutes", "hours")
   active: boolean;
   createdAt: string;
   order: number;
