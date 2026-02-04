@@ -8,6 +8,7 @@ interface PortfolioState {
   loadStocks: () => Promise<void>;
   addStock: (stock: Omit<Stock, 'id' | 'createdAt' | 'lastUpdated'>) => Promise<void>;
   averageStock: (id: string, quantity: number, buyPrice: number) => Promise<void>;
+  sellStock: (id: string, quantity: number, sellPrice: number) => Promise<{ realizedPL: number } | null>;
   updateStock: (id: string, updates: Partial<Stock>) => Promise<void>;
   updateStockPrice: (id: string, currentPrice: number) => Promise<void>;
   deleteStock: (id: string) => Promise<void>;
@@ -64,6 +65,33 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
     set({
       stocks: get().stocks.map(s => s.id === id ? { ...s, ...updates } : s),
     });
+  },
+
+  sellStock: async (id, quantity, sellPrice) => {
+    const stock = get().stocks.find(s => s.id === id);
+    if (!stock || quantity > stock.quantity) return null;
+    
+    // Calculate realized P&L for the sold shares
+    const realizedPL = (sellPrice - stock.avgBuyPrice) * quantity;
+    const newQuantity = stock.quantity - quantity;
+    
+    if (newQuantity === 0) {
+      // Sold all shares - delete the stock
+      await db.stocks.delete(id);
+      set({ stocks: get().stocks.filter(s => s.id !== id) });
+    } else {
+      // Partial sell - update quantity (avg price remains the same)
+      const updates = {
+        quantity: newQuantity,
+        lastUpdated: new Date().toISOString(),
+      };
+      await db.stocks.update(id, updates);
+      set({
+        stocks: get().stocks.map(s => s.id === id ? { ...s, ...updates } : s),
+      });
+    }
+    
+    return { realizedPL };
   },
 
   updateStock: async (id, updates) => {

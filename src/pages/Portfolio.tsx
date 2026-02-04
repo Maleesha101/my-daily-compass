@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { Plus, Trash2, TrendingUp, TrendingDown, Layers } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, TrendingDown, Layers, ArrowDownRight } from 'lucide-react';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { StatCard } from '@/components/shared/StatCard';
 import { formatCurrency, getPLColor } from '@/utils/helpers';
@@ -40,6 +40,7 @@ export default function Portfolio() {
     loadStocks,
     addStock,
     averageStock,
+    sellStock,
     updateStockPrice,
     deleteStock,
     getTotalInvested,
@@ -50,6 +51,7 @@ export default function Portfolio() {
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isAverageDialogOpen, setIsAverageDialogOpen] = useState(false);
+  const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [formData, setFormData] = useState({
     symbol: '',
@@ -61,6 +63,10 @@ export default function Portfolio() {
   const [averageFormData, setAverageFormData] = useState({
     quantity: 0,
     buyPrice: 0,
+  });
+  const [sellFormData, setSellFormData] = useState({
+    quantity: 0,
+    sellPrice: 0,
   });
 
   useEffect(() => {
@@ -93,6 +99,26 @@ export default function Portfolio() {
       setIsAverageDialogOpen(false);
       setSelectedStock(null);
       setAverageFormData({ quantity: 0, buyPrice: 0 });
+    }
+  };
+
+  const handleOpenSell = (stock: Stock) => {
+    setSelectedStock(stock);
+    setSellFormData({ quantity: 0, sellPrice: stock.currentPrice });
+    setIsSellDialogOpen(true);
+  };
+
+  const handleSellSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedStock && sellFormData.quantity > 0 && sellFormData.quantity <= selectedStock.quantity) {
+      const result = await sellStock(selectedStock.id, sellFormData.quantity, sellFormData.sellPrice);
+      if (result) {
+        const plColor = result.realizedPL >= 0 ? 'text-success' : 'text-destructive';
+        alert(`Sold ${sellFormData.quantity} shares. Realized P&L: ${result.realizedPL >= 0 ? '+' : ''}${formatCurrency(result.realizedPL)}`);
+      }
+      setIsSellDialogOpen(false);
+      setSelectedStock(null);
+      setSellFormData({ quantity: 0, sellPrice: 0 });
     }
   };
 
@@ -256,6 +282,83 @@ export default function Portfolio() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Sell Stock Dialog */}
+        <Dialog open={isSellDialogOpen} onOpenChange={setIsSellDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Sell {selectedStock?.symbol} Shares</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSellSubmit} className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg text-sm">
+                <p>Current: <strong>{selectedStock?.quantity}</strong> shares @ <strong>{formatCurrency(selectedStock?.avgBuyPrice || 0)}</strong> avg</p>
+              </div>
+              <div>
+                <Label htmlFor="sellQuantity">Quantity to Sell</Label>
+                <Input
+                  id="sellQuantity"
+                  type="number"
+                  min={1}
+                  max={selectedStock?.quantity || 1}
+                  value={sellFormData.quantity || ''}
+                  onChange={(e) => setSellFormData({ ...sellFormData, quantity: Number(e.target.value) })}
+                  required
+                />
+                <p className="text-xs text-muted-foreground mt-1">Max: {selectedStock?.quantity} shares</p>
+              </div>
+              <div>
+                <Label htmlFor="sellPrice">Sell Price (LKR)</Label>
+                <Input
+                  id="sellPrice"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={sellFormData.sellPrice || ''}
+                  onChange={(e) => setSellFormData({ ...sellFormData, sellPrice: Number(e.target.value) })}
+                  required
+                />
+              </div>
+              {selectedStock && sellFormData.quantity > 0 && sellFormData.sellPrice > 0 && (
+                <div className={cn(
+                  "p-3 rounded-lg text-sm",
+                  (sellFormData.sellPrice - selectedStock.avgBuyPrice) >= 0 
+                    ? "bg-success/10" 
+                    : "bg-destructive/10"
+                )}>
+                  <p className="font-medium">Sale Preview:</p>
+                  <p>Selling: <strong>{sellFormData.quantity}</strong> shares @ <strong>{formatCurrency(sellFormData.sellPrice)}</strong></p>
+                  <p>Sale Value: <strong>{formatCurrency(sellFormData.quantity * sellFormData.sellPrice)}</strong></p>
+                  <p className={cn(
+                    "font-medium",
+                    (sellFormData.sellPrice - selectedStock.avgBuyPrice) >= 0 
+                      ? "text-success" 
+                      : "text-destructive"
+                  )}>
+                    Realized P&L: {(sellFormData.sellPrice - selectedStock.avgBuyPrice) >= 0 ? '+' : ''}
+                    {formatCurrency((sellFormData.sellPrice - selectedStock.avgBuyPrice) * sellFormData.quantity)}
+                  </p>
+                  {sellFormData.quantity < selectedStock.quantity && (
+                    <p className="mt-2 text-muted-foreground">
+                      Remaining: {selectedStock.quantity - sellFormData.quantity} shares
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex gap-2 justify-end">
+                <Button type="button" variant="outline" onClick={() => setIsSellDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  variant="destructive"
+                  disabled={!sellFormData.quantity || sellFormData.quantity > (selectedStock?.quantity || 0)}
+                >
+                  Sell Shares
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats */}
@@ -347,28 +450,37 @@ export default function Portfolio() {
                         {pl >= 0 ? '+' : ''}{formatCurrency(pl)}
                         <span className="text-xs ml-1">({plPercent.toFixed(1)}%)</span>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleOpenAverage(stock)}
-                            title="Add shares (average)"
-                          >
-                            <Layers className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            onClick={() => handleDelete(stock.id)}
-                            title="Remove stock"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handleOpenAverage(stock)}
+                              title="Add shares (average)"
+                            >
+                              <Layers className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-warning"
+                              onClick={() => handleOpenSell(stock)}
+                              title="Sell shares"
+                            >
+                              <ArrowDownRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => handleDelete(stock.id)}
+                              title="Remove stock"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                     </TableRow>
                   );
                 })}
