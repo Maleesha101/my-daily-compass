@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 
 export function HabitMatrix() {
   const { habits, entries, selectedMonth, toggleHabitEntry, setNumericEntry } = useHabitStore();
+
   const activeHabits = habits.filter(h => h.active);
   
   const days = useMemo(() => getMonthDays(selectedMonth), [selectedMonth]);
@@ -257,6 +258,98 @@ export function HabitMatrix() {
             </div>
           );
         })}
+
+        {/* Summary row */}
+        <div className="flex gap-4 items-center py-1 mt-2 border-t border-border">
+          <div className="w-32 shrink-0 text-xs font-semibold text-muted-foreground">
+            Daily Total
+          </div>
+          <div className="w-12 shrink-0" />
+          {weeks.map((week, weekIdx) => (
+            <div key={weekIdx} className="flex-1 flex gap-0.5 justify-center">
+              {week.map((day, dayIdx) => {
+                if (!day) return <div key={dayIdx} className="w-5 h-5" />;
+
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const today = isToday(day);
+
+                // Sum numeric daily habit values + count boolean completions
+                const numericSum = activeHabits
+                  .filter(h => h.type === 'numeric' && h.period === 'daily')
+                  .reduce((sum, h) => sum + getEntryValue(h.id, dateStr), 0);
+
+                const booleanCount = activeHabits
+                  .filter(h => !(h.type === 'numeric' && h.period === 'daily'))
+                  .filter(h => isCompleted(h.id, dateStr)).length;
+
+                const booleanTotal = activeHabits.filter(
+                  h => !(h.type === 'numeric' && h.period === 'daily')
+                ).length;
+
+                const hasAnyEntry = numericSum > 0 || booleanCount > 0;
+
+                return (
+                  <Tooltip key={dayIdx}>
+                    <TooltipTrigger asChild>
+                      <div
+                        className={cn(
+                          'w-5 h-5 rounded-sm flex items-center justify-center text-[7px] font-bold cursor-default',
+                          hasAnyEntry
+                            ? 'bg-primary/20 text-primary'
+                            : 'bg-muted/40 text-muted-foreground',
+                          today && 'ring-2 ring-primary ring-offset-1'
+                        )}
+                      >
+                        {booleanCount > 0 || numericSum > 0
+                          ? booleanTotal > 0
+                            ? booleanCount
+                            : ''
+                          : ''}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-medium">{format(day, 'EEE, MMM d')}</p>
+                      {booleanTotal > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {booleanCount}/{booleanTotal} habits done
+                        </p>
+                      )}
+                      {numericSum > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          {numericSum} numeric units logged
+                        </p>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          ))}
+          <div className="w-24 shrink-0">
+            {/* Monthly totals */}
+            {(() => {
+              const totalNumeric = activeHabits
+                .filter(h => h.type === 'numeric' && h.period === 'daily')
+                .reduce(
+                  (sum, h) =>
+                    sum + entries.filter(e => e.habitId === h.id).reduce((s, e) => s + e.value, 0),
+                  0
+                );
+              const totalBoolean = activeHabits
+                .filter(h => !(h.type === 'numeric' && h.period === 'daily'))
+                .reduce(
+                  (sum, h) => sum + entries.filter(e => e.habitId === h.id).length,
+                  0
+                );
+              return (
+                <div className="text-[10px] text-muted-foreground text-center leading-tight">
+                  {totalBoolean > 0 && <div>{totalBoolean} checks</div>}
+                  {totalNumeric > 0 && <div>{totalNumeric} units</div>}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       </div>
     </div>
   );
